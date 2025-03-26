@@ -9,6 +9,38 @@ import SwiftUI
 
 public struct SVGParser {
 
+    static public func parseConcurrent(contentsOf url: URL, settings: SVGSettings = .default) -> SVGNode? {
+        let xml = DOMParser.parse(contentsOf: url, logger: settings.logger)
+        guard let xml = xml else { return nil }
+
+        let parentContext = SVGRootContext(
+            logger: settings.logger,
+            linker: settings.linker,
+            screen: SVGScreen.main(ppi: settings.ppi),
+            index: SVGIndex(element: xml),
+            defaultFontSize: settings.fontSize
+        )
+        guard let context = parentContext.create(for: xml) else { return nil }
+
+        let parsers: [String:SVGElementParser] = [
+            "svg": SVGViewportParser(),
+            "g": SVGGroupParser(),
+            "use": SVGUseParser(),
+            "text": SVGTextParser(),
+            "image": SVGImageParser(),
+            "rect": SVGRectParser(),
+            "circle": SVGCircleParser(),
+            "ellipse": SVGEllipseParser(),
+            "line": SVGLineParser(),
+            "polygon": SVGPolygonParser(),
+            "polyline": SVGPolylineParser(),
+            "path": SVGPathParser(),
+        ]
+        return parsers[context.element.name]?.parse(context: context) {
+            parse(element: $0, parentContext: context)
+        }
+    }
+
     static public func parse(contentsOf url: URL, settings: SVGSettings = .default) -> SVGNode? {
         let xml = DOMParser.parse(contentsOf: url, logger: settings.logger)
         return parse(xml: xml, settings: settings.linkIfNeeded(to: url))
